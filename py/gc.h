@@ -75,5 +75,4 @@ void gc_dump_alloc_table(void);
 #define GC_EXIT()
 #endif
 
-
 #endif // MICROPY_INCLUDED_PY_GC_H
