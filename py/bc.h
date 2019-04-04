@@ -80,9 +80,9 @@ typedef struct _mp_code_state_t {
     // bit 0 is saved currently_in_except_block value
     mp_exc_stack_t *exc_sp;
     mp_obj_dict_t *old_globals;
-    #if MICROPY_STACKLESS
+    //#if MICROPY_STACKLESS
     struct _mp_code_state_t *prev;
-    #endif
+    //#endif
     // Variable-length
     mp_obj_t state[0];
     // Variable-length, never accessed by name, only as (void*)(state + n_state)

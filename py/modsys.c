@@ -119,6 +119,26 @@ STATIC mp_obj_t mp_sys_print_exception(size_t n_args, const mp_obj_t *args) {
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_sys_print_exception_obj, 1, 2, mp_sys_print_exception);
 
+
+void mp_obj_print_stack(const mp_print_t *print);
+STATIC mp_obj_t mp_sys_print_stack(size_t n_args, const mp_obj_t *args) {
+    #if MICROPY_PY_IO && MICROPY_PY_SYS_STDFILES
+    void *stream_obj = &mp_sys_stdout_obj;
+    if (n_args > 0) {
+        stream_obj = MP_OBJ_TO_PTR(args[0]); // XXX may fail
+    }
+    mp_print_t print = {stream_obj, mp_stream_write_adaptor};
+    mp_obj_print_stack(&print);
+    #else
+    (void)n_args;
+    mp_obj_print_stack(&mp_plat_print);
+    #endif
+
+    return mp_const_none;
+}
+MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_sys_print_stack_obj, 0, 1, mp_sys_print_stack);
+
+
 #if MICROPY_PY_SYS_EXC_INFO
 STATIC mp_obj_t mp_sys_exc_info(void) {
     mp_obj_t cur_exc = MP_OBJ_FROM_PTR(MP_STATE_VM(cur_exception));
@@ -201,6 +221,7 @@ STATIC const mp_rom_map_elem_t mp_module_sys_globals_table[] = {
      */
 
     { MP_ROM_QSTR(MP_QSTR_print_exception), MP_ROM_PTR(&mp_sys_print_exception_obj) },
+    { MP_ROM_QSTR(MP_QSTR_print_stack), MP_ROM_PTR(&mp_sys_print_stack_obj) },
 };
 
 STATIC MP_DEFINE_CONST_DICT(mp_module_sys_globals, mp_module_sys_globals_table);

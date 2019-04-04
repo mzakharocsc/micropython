@@ -249,6 +249,8 @@ mp_code_state_t *mp_obj_fun_bc_prepare_codestate(mp_obj_t self_in, size_t n_args
 }
 #endif
 
+mp_code_state_t * g_code_state = NULL;
+
 STATIC mp_obj_t fun_bc_call(mp_obj_t self_in, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     MP_STACK_CHECK();
 
@@ -279,10 +281,15 @@ STATIC mp_obj_t fun_bc_call(mp_obj_t self_in, size_t n_args, size_t n_kw, const 
 
     INIT_CODESTATE(code_state, self, n_args, n_kw, args);
 
+    code_state->prev = g_code_state;
+    g_code_state = code_state;
+
     // execute the byte code with the correct globals context
     mp_globals_set(self->globals);
     mp_vm_return_kind_t vm_return_kind = mp_execute_bytecode(code_state, MP_OBJ_NULL);
     mp_globals_set(code_state->old_globals);
+
+    g_code_state = g_code_state->prev;
 
 #if VM_DETECT_STACK_OVERFLOW
     if (vm_return_kind == MP_VM_RETURN_NORMAL) {
@@ -524,3 +531,68 @@ mp_obj_t mp_obj_new_fun_asm(size_t n_args, void *fun_data, mp_uint_t type_sig) {
 }
 
 #endif // MICROPY_EMIT_INLINE_ASM
+
+
+void mp_obj_print_stack(const mp_print_t *print) {
+    mp_code_state_t * code_state = g_code_state;
+    while(code_state != NULL) {
+
+        const byte *ip = code_state->fun_bc->bytecode;
+        ip = mp_decode_uint_skip(ip); // skip n_state
+        ip = mp_decode_uint_skip(ip); // skip n_exc_stack
+        ip++; // skip scope_params
+        ip++; // skip n_pos_args
+        ip++; // skip n_kwonly_args
+        ip++; // skip n_def_pos_args
+        size_t bc = code_state->ip - ip;
+        size_t code_info_size = mp_decode_uint_value(ip);
+        ip = mp_decode_uint_skip(ip); // skip code_info_size
+        bc -= code_info_size;
+        #if MICROPY_PERSISTENT_CODE
+        qstr block_name = ip[0] | (ip[1] << 8);
+        qstr source_file = ip[2] | (ip[3] << 8);
+        ip += 4;
+        #else
+        qstr block_name = mp_decode_uint_value(ip);
+        ip = mp_decode_uint_skip(ip);
+        qstr source_file = mp_decode_uint_value(ip);
+        ip = mp_decode_uint_skip(ip);
+        #endif
+        size_t source_line = 1;
+        size_t c;
+        while ((c = *ip)) {
+            size_t b, l;
+            if ((c & 0x80) == 0) {
+                // 0b0LLBBBBB encoding
+                b = c & 0x1f;
+                l = c >> 5;
+                ip += 1;
+            } else {
+                // 0b1LLLBBBB 0bLLLLLLLL encoding (l's LSB in second byte)
+                b = c & 0xf;
+                l = ((c << 4) & 0x700) | ip[1];
+                ip += 2;
+            }
+            if (bc >= b) {
+                bc -= b;
+                source_line += l;
+            } else {
+                // found source line corresponding to bytecode offset
+                break;
+            }
+        }
+#if MICROPY_ENABLE_SOURCE_LINE
+        mp_printf(print, "  File \"%q\", line %d", source_file, (int)source_line);
+#else
+        mp_printf(print, "  File \"%q\"", source_file);
+#endif
+        if (block_name== MP_QSTR_NULL) {
+            mp_print_str(print, "\n");
+        } else {
+            mp_printf(print, ", in %q\n", block_name);
+        }
+
+        code_state = code_state->prev;
+    }
+}
+
