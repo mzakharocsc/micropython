@@ -9,7 +9,7 @@ ifdef BOARD_DIR
 BOARD ?= $(notdir $(BOARD_DIR:/=))
 else
 # If not given on the command line, then default to ESP32_GENERIC.
-BOARD ?= ESP32_GENERIC
+BOARD ?= ESP32_GENERIC_C6
 BOARD_DIR ?= boards/$(BOARD)
 endif
 
@@ -43,6 +43,8 @@ ifdef USER_C_MODULES
 endif
 
 IDFPY_FLAGS += -D MICROPY_BOARD=$(BOARD) -D MICROPY_BOARD_DIR="$(abspath $(BOARD_DIR))" $(CMAKE_ARGS)
+DEVICE +=  -p $(PORT) -b $(BAUD)
+DEVICE2 =  -p $(PORT)
 
 ifdef FROZEN_MANIFEST
        IDFPY_FLAGS += -D MICROPY_FROZEN_MANIFEST=$(FROZEN_MANIFEST)
@@ -59,7 +61,7 @@ endif
 HELP_BUILD_ERROR ?= "See \033[1;31mhttps://github.com/micropython/micropython/wiki/Build-Troubleshooting\033[0m"
 
 define RUN_IDF_PY
-	idf.py $(IDFPY_FLAGS) -B $(BUILD) -p $(PORT) -b $(BAUD) $(1)
+	idf.py $(IDFPY_FLAGS) -B $(BUILD) $(1)
 endef
 
 all:
@@ -78,13 +80,16 @@ clean:
 	$(call RUN_IDF_PY,fullclean)
 
 deploy:
-	$(call RUN_IDF_PY,flash)
+	$(call RUN_IDF_PY,$(DEVICE) flash)
+
+menuconfig:
+	$(call RUN_IDF_PY,$(DEVICE) menuconfig)
 
 erase:
-	$(call RUN_IDF_PY,erase-flash)
+	$(call RUN_IDF_PY,$(DEVICE) erase-flash)
 
 monitor:
-	$(call RUN_IDF_PY,monitor)
+	$(call RUN_IDF_PY,$(DEVICE2) monitor)
 
 size:
 	$(call RUN_IDF_PY,size)
