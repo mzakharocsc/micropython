@@ -800,6 +800,9 @@ void *gc_alloc(size_t n_bytes, unsigned int alloc_flags) {
     if (!collected && MP_STATE_MEM(gc_alloc_amount) >= MP_STATE_MEM(gc_alloc_threshold)) {
         GC_EXIT();
         gc_collect();
+        gc_info_t info;
+        gc_info(&info);
+        MP_STATE_MEM(gc_alloc_threshold) = info.free * 2 / 3 / MICROPY_BYTES_PER_GC_BLOCK;
         collected = 1;
         GC_ENTER();
     }
